@@ -1,4 +1,4 @@
-# 🎟️ Eventora - Event Booking Web Application
+# 🎟️ EventSphere - Event Booking Web Application
 
 Eventora is a full-stack event booking platform that allows users to discover events, register securely, and manage bookings in real-time. It provides a seamless experience for both users and administrators with features like OTP verification, role-based dashboards, and dynamic event management.
 

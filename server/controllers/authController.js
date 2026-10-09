@@ -56,7 +56,7 @@ exports.register = async (req, res) => {
                 needsVerification: true
             });
         } catch (emailErr) {
-            console.error('Email delivery error on register:', emailErr.message);
+            console.error('Email delivery error on register:', emailErr.stack || emailErr);
             return res.status(502).json({
                 message: `Account registered, but OTP email failed: ${emailErr.message}`,
                 emailDeliveryFailed: true,

@@ -8,7 +8,6 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const getSenderEmail = () => {
 const email = process.env.RESEND_FROM_EMAIL;
 
-```
 if (!email) {
     throw new Error(
         'RESEND_FROM_EMAIL is missing. Configure a verified sender email in Render.'
@@ -16,10 +15,8 @@ if (!email) {
 }
 
 return email;
-```
 
 };
-
 /**
 
 * Send booking confirmation email with EventSphere design

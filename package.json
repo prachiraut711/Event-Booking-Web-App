@@ -18,5 +18,8 @@
     "eventsphere"
   ],
   "author": "prachi",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "resend": "^6.32.1"
+  }
 }

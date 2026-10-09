@@ -1,19 +1,21 @@
 {
-  "name": "eventora-server",
+  "name": "eventsphere-server",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "seed": "node seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "event",
-    "booking"
+    "booking",
+    "eventsphere"
   ],
   "author": "prachi",
   "license": "ISC",
-  "description": "",
+  "description": "EventSphere Backend REST API",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

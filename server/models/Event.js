@@ -1,45 +1,59 @@
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
-    title: { 
-        type: String, 
-        required: true 
+    title: {
+        type: String,
+        required: true,
+        trim: true
     },
-    description: { 
-        type: String, 
-        required: true 
+    description: {
+        type: String,
+        required: true,
+        trim: true
     },
-    date: { 
-        type: Date, 
-        required: true 
+    date: {
+        type: Date,
+        required: true,
+        index: true
     },
-    location: { 
-        type: String, 
-        required: true 
+    time: {
+        type: String,
+        default: '10:00 AM'
     },
-    category: { 
-        type: String, 
-        required: true 
+    location: {
+        type: String,
+        required: true,
+        trim: true
     },
-    totalSeats: { 
-        type: Number, 
-        required: true 
+    category: {
+        type: String,
+        required: true,
+        trim: true,
+        index: true
     },
-    availableSeats: { 
-        type: Number, 
-        required: true 
+    totalSeats: {
+        type: Number,
+        required: true,
+        min: 1
     },
-    image: { 
-        type: String 
+    availableSeats: {
+        type: Number,
+        required: true,
+        min: 0
     },
-    ticketPrice: { 
-        type: Number, 
-        required: true, 
-        default: 0 
+    image: {
+        type: String,
+        default: ''
     },
-    createdBy: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User' 
+    ticketPrice: {
+        type: Number,
+        required: true,
+        default: 0,
+        min: 0
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, { timestamps: true });
 

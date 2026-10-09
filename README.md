@@ -1,153 +1,120 @@
-# 🎟️ EventSphere - Event Booking Web Application
+# EventSphere
 
-Eventora is a full-stack event booking platform that allows users to discover events, register securely, and manage bookings in real-time. It provides a seamless experience for both users and administrators with features like OTP verification, role-based dashboards, and dynamic event management.
+A full-stack event discovery and ticket booking platform built with React, Node.js, Express, and MongoDB.
 
----
+**Live Demo:** Coming soon
 
-## 🚀 Project Demo
+## Tech Stack
 
-🎥 Watch the full demo here:
-https://www.youtube.com/watch?v=0TlHoaTM-II
+* **Frontend:** React 19, Vite, Tailwind CSS, React Router, Axios
+* **Backend:** Node.js, Express
+* **Database:** MongoDB, Mongoose
+* **Authentication:** JWT, bcryptjs, email OTP
+* **Other:** Nodemailer, QR code generation
 
----
+## Features
 
-## ✨ Features
+* Browse, search, filter, and sort events.
+* Register and verify accounts using email OTP.
+* Book multiple tickets with dynamic price calculations.
+* Generate digital e-tickets with QR codes.
+* View and cancel bookings.
+* Manage events and approve bookings through the admin dashboard.
+* Track event capacity, bookings, and revenue.
 
-* 🔐 User Authentication with Email & OTP Verification
-* 👤 Role-Based Access (User & Admin)
-* 📅 Browse and Search Events
-* 🎟️ Book Events with OTP Confirmation
-* 📊 Admin Dashboard for Event Management
-* 📉 Real-time Seat Availability Tracking
-* 📧 Email Notifications using Nodemailer
-* ⚡ Responsive UI with modern design
+## Screenshots
 
----
+### Home Page
 
-## 🛠️ Tech Stack
+![EventSphere Home Page](docs/screenshots/home-page.png)
 
-### Frontend
+### Event Details
 
-* React.js (Vite)
-* Tailwind CSS
-* React Router
-* Axios
+![Event Details](docs/screenshots/event-details.png)
 
-### Backend
+### Demo Checkout
 
-* Node.js
-* Express.js
-* MongoDB (Mongoose)
+![Demo Checkout](docs/screenshots/checkout.png)
 
-### Other Tools
+*Demo checkout only. No real money is charged.*
 
-* JWT Authentication
-* Nodemailer (Email Service)
-* dotenv (Environment Variables)
+### Digital E-Ticket
 
----
+![Digital E-Ticket](docs/screenshots/digital-ticket.png)
 
-## 📁 Project Structure
+### Admin Dashboard
 
-Event-Booking-Web-App/
-├── client/        # Frontend (React + Vite)
-├── server/        # Backend (Node + Express)
-└── README.md
+![Admin Dashboard](docs/screenshots/admin-dashboard.png)
 
----
+### Booking Management
 
-## ⚙️ Installation & Setup
+![Booking Management](docs/screenshots/booking-management.png)
 
-### 1️⃣ Clone the Repository
+## Run Locally
+
+**Requirements:** Node.js, npm, and MongoDB.
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/prachiraut711/Event-Booking-Web-App.git
 cd Event-Booking-Web-App
 ```
 
----
-
-### 2️⃣ Setup Backend
+### 2. Install dependencies
 
 ```bash
 cd server
 npm install
-```
 
-Create a `.env` file in the server folder and add:
-
-```env
-PORT=5000
-MONGODB_URL=your_mongodb_connection_string
-EMAIL_USER=your_email
-EMAIL_PASS=your_email_app_password
-JWT_SECRET=your_secret_key
-```
-
-Run backend:
-
-```bash
-npm run dev
-```
-
----
-
-### 3️⃣ Setup Frontend
-
-```bash
 cd ../client
 npm install
+```
+
+### 3. Configure environment variables
+
+Create `server/.env` using `server/.env.example`, and `client/.env` using `client/.env.example`.
+
+Configure your MongoDB connection, JWT secret, email settings, and frontend API URL. Never commit real credentials.
+
+For local development, set the frontend API URL to:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
+### 4. Seed sample data
+
+From the `server` directory, run:
+
+```bash
+node seed.js
+```
+
+Review the seed script before running it against any database containing data you want to preserve.
+
+### 5. Start the application
+
+In one terminal, from the `server` directory:
+
+```bash
 npm run dev
 ```
 
-Frontend will run on:
-http://localhost:5173
+In another terminal, from the `client` directory:
 
-Backend will run on:
-http://localhost:5000
+```bash
+npm run dev
+```
 
----
+Open `http://localhost:5173` in your browser.
 
-## 🔐 Authentication Flow
+## Payment Notice
 
-* User registers → OTP sent via email
-* User verifies OTP → Account activated
-* Login with credentials
-* Role-based navigation (Admin/User)
+EventSphere uses a simulated checkout flow for demonstration purposes. It does not charge real money or use a live payment gateway.
 
----
-
-## 📌 API Endpoints
-
-### Auth
-
-* POST `/api/auth/register`
-* POST `/api/auth/login`
-* POST `/api/auth/verify-otp`
-
-### Events
-
-* GET `/api/events`
-* GET `/api/events/:id`
-
-### Bookings
-
-* POST `/api/bookings/send-otp`
-* POST `/api/bookings`
-
----
-
-## 🎯 Future Enhancements
-
-* 💳 Payment Integration (Stripe/Razorpay)
-* 📱 Mobile App Version
-* 👥 Group Bookings
-* ⭐ Event Reviews & Ratings
-
----
-
-## 👩‍💻 Author
+## Author
 
 **Prachi Raut**
-GitHub: https://github.com/prachiraut711
 
+[GitHub](https://github.com/prachiraut711) · [Project Repository](https://github.com/prachiraut711/Event-Booking-Web-App)

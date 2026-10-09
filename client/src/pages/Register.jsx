@@ -58,12 +58,24 @@ const Register = () => {
                 setResendCooldown(60);
 
                 if (data.emailDeliveryFailed) {
-                    setEmailWarning(`Account created, but email could not be sent: ${data.message}`);
+                    setEmailWarning(data.message || 'Verification email could not be delivered.');
+                    setError('The verification code could not be delivered to this email address. Real OTP verification is required to activate your account. Please retry sending the code or verify using an authorized email address.');
                 } else {
                     toast.success('Verification code dispatched to your email.');
                 }
             } catch (err) {
-                setError(err.message || 'Registration failed');
+                if (err.needsVerification) {
+                    setShowOTP(true);
+                    setResendCooldown(60);
+                    if (err.emailDeliveryFailed) {
+                        setEmailWarning(err.message || 'Verification email could not be delivered.');
+                        setError('The verification code could not be delivered to this email address. Real OTP verification is required to activate your account. Please retry sending the code or verify using an authorized email address.');
+                    } else {
+                        setError(err.message || 'Please enter the verification code sent to your email.');
+                    }
+                } else {
+                    setError(err.message || 'Registration failed');
+                }
             } finally {
                 setLoading(false);
             }
@@ -92,8 +104,9 @@ const Register = () => {
             toast.success(data.message || 'A new code has been sent.');
             setResendCooldown(60);
         } catch (err) {
-            if (err.message.includes('deliver') || err.message.includes('SMTP')) {
-                setEmailWarning(err.message);
+            if (err.emailDeliveryFailed || err.message?.includes('deliver') || err.message?.includes('restricted') || err.message?.includes('Resend')) {
+                setEmailWarning(err.message || 'Verification code could not be delivered.');
+                setError('The verification code could not be delivered. Real OTP verification is required to activate your account. Please check the email address or retry.');
             } else {
                 setError(err.message);
             }
@@ -261,6 +274,20 @@ const Register = () => {
                                     <span>
                                         {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                                     </span>
+                                </button>
+                            </div>
+
+                            <div className="pt-3 text-center border-t border-slate-100 mt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowOTP(false);
+                                        setError('');
+                                        setEmailWarning('');
+                                    }}
+                                    className="text-xs text-slate-500 hover:text-slate-800 underline transition"
+                                >
+                                    ← Edit details or try another email
                                 </button>
                             </div>
                         </div>

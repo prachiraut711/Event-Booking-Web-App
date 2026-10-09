@@ -2,7 +2,7 @@ const User = require('../models/User');
 const OTP = require('../models/OTP');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { sendOTPEmail } = require('../utils/email');
+const { sendOTPEmail, formatEmailErrorMessage } = require('../utils/email');
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -47,6 +47,10 @@ exports.register = async (req, res) => {
         await OTP.findOneAndDelete({ email: normalizedEmail, action: 'account_verification' });
         await OTP.create({ email: normalizedEmail, otp, action: 'account_verification' });
 
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`🔑 [DEV ONLY] Verification OTP for ${normalizedEmail}: ${otp}`);
+        }
+
         // Attempt sending email
         try {
             await sendOTPEmail(normalizedEmail, otp, 'account_verification');
@@ -56,9 +60,10 @@ exports.register = async (req, res) => {
                 needsVerification: true
             });
         } catch (emailErr) {
-            console.error('Email delivery error on register:', emailErr.stack || emailErr);
+            console.error('Email delivery error on register:', emailErr.message);
+            const userFriendlyMessage = formatEmailErrorMessage(emailErr);
             return res.status(502).json({
-                message: `Account registered, but OTP email failed: ${emailErr.message}`,
+                message: userFriendlyMessage,
                 emailDeliveryFailed: true,
                 email: user.email,
                 needsVerification: true
@@ -95,6 +100,10 @@ exports.login = async (req, res) => {
             await OTP.findOneAndDelete({ email: user.email, action: 'account_verification' });
             await OTP.create({ email: user.email, otp, action: 'account_verification' });
 
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`🔑 [DEV ONLY] Verification OTP for ${user.email}: ${otp}`);
+            }
+
             try {
                 await sendOTPEmail(user.email, otp, 'account_verification');
                 return res.status(403).json({
@@ -103,8 +112,10 @@ exports.login = async (req, res) => {
                     email: user.email
                 });
             } catch (emailErr) {
+                console.error('Email delivery error on login:', emailErr.message);
+                const userFriendlyMessage = formatEmailErrorMessage(emailErr);
                 return res.status(403).json({
-                    message: `Account not verified. Could not send OTP email: ${emailErr.message}`,
+                    message: `Account not verified. ${userFriendlyMessage}`,
                     needsVerification: true,
                     emailDeliveryFailed: true,
                     email: user.email
@@ -190,12 +201,18 @@ exports.resendOTP = async (req, res) => {
         await OTP.findOneAndDelete({ email: normalizedEmail, action });
         await OTP.create({ email: normalizedEmail, otp, action });
 
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`🔑 [DEV ONLY] Resent OTP for ${normalizedEmail} (${action}): ${otp}`);
+        }
+
         try {
             await sendOTPEmail(normalizedEmail, otp, action);
             return res.json({ message: 'A new verification code has been sent to your email.' });
         } catch (emailErr) {
+            console.error('Email delivery error on resend OTP:', emailErr.message);
+            const userFriendlyMessage = formatEmailErrorMessage(emailErr);
             return res.status(502).json({
-                message: `Failed to deliver email: ${emailErr.message}`,
+                message: userFriendlyMessage,
                 emailDeliveryFailed: true
             });
         }

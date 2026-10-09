@@ -1,7 +1,7 @@
 const Booking = require('../models/Bookings');
 const Event = require('../models/Event');
 const OTP = require('../models/OTP');
-const { sendBookingEmail, sendOTPEmail } = require('../utils/email');
+const { sendBookingEmail, sendOTPEmail, formatEmailErrorMessage } = require('../utils/email');
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -23,12 +23,18 @@ exports.sendBookingOTP = async (req, res) => {
         await OTP.findOneAndDelete({ email: req.user.email, action: 'event_booking' });
         await OTP.create({ email: req.user.email, otp, action: 'event_booking' });
 
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`🔑 [DEV ONLY] Booking OTP for ${req.user.email}: ${otp}`);
+        }
+
         try {
             await sendOTPEmail(req.user.email, otp, 'event_booking');
             res.json({ message: 'OTP sent to your email successfully' });
         } catch (emailErr) {
+            console.error('Email delivery error on booking OTP:', emailErr.message);
+            const userFriendlyMessage = formatEmailErrorMessage(emailErr);
             res.status(502).json({
-                message: `Failed to deliver OTP email: ${emailErr.message}`,
+                message: userFriendlyMessage,
                 emailDeliveryFailed: true
             });
         }

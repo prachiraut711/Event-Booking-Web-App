@@ -80,6 +80,9 @@ export const AuthProvider = ({ children }) => {
             const { data } = await api.post('/auth/register', { name, email, password });
             return data; // Returns { message, email, needsVerification, emailDeliveryFailed? }
         } catch (error) {
+            if (error.response?.data?.needsVerification) {
+                throw error.response.data;
+            }
             const serverMsg = error.response?.data?.message;
             throw new Error(serverMsg || 'Registration failed. Please try again.');
         }

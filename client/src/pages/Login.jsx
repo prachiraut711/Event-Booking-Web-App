@@ -54,7 +54,8 @@ const Login = () => {
                 setShowOTP(true);
                 setResendCooldown(60);
                 if (err.emailDeliveryFailed) {
-                    setEmailWarning(`Note: ${err.message}`);
+                    setEmailWarning(err.message || 'OTP email could not be delivered.');
+                    setError('The verification code could not be delivered to this email address. Real OTP verification is required to sign in. Please retry sending the code or verify using an authorized email address.');
                 } else {
                     setError('Your account requires verification. A 6-digit OTP has been sent to your email.');
                 }
@@ -77,8 +78,9 @@ const Login = () => {
             toast.success(data.message || 'A new code has been sent.');
             setResendCooldown(60);
         } catch (err) {
-            if (err.message.includes('deliver') || err.message.includes('SMTP')) {
-                setEmailWarning(err.message);
+            if (err.emailDeliveryFailed || err.message?.includes('deliver') || err.message?.includes('restricted') || err.message?.includes('Resend')) {
+                setEmailWarning(err.message || 'Verification code could not be delivered.');
+                setError('The verification code could not be delivered. Real OTP verification is required to sign in. Please check the email address or retry.');
             } else {
                 setError(err.message);
             }

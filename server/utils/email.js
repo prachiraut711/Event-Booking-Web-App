@@ -3,19 +3,22 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const getSenderEmail = () => {
-const email = process.env.RESEND_FROM_EMAIL;
+  if (process.env.RESEND_FROM_EMAIL) {
+    return process.env.RESEND_FROM_EMAIL;
+  }
 
-if (!email) {
-    throw new Error(
-        'RESEND_FROM_EMAIL is missing. Configure a verified sender email in Render.'
-    );
-}
+  if (process.env.NODE_ENV === 'production') {
+    const errorMsg = 'Production email configuration is missing: RESEND_FROM_EMAIL must be set.';
+    console.error(`[Email Config Error] ${errorMsg}`);
+    const err = new Error(errorMsg);
+    err.isConfigurationError = true;
+    throw err;
+  }
 
-return email;
-
+  return 'onboarding@resend.dev';
 };
 /**
 
@@ -29,8 +32,15 @@ return email;
   seatsCount = 1,
   amount = 0
   ) => {
+  if (!resend) {
+    const err = new Error('Email delivery service is unconfigured. RESEND_API_KEY is not set.');
+    err.isConfigurationError = true;
+    throw err;
+  }
+
+  const senderEmail = getSenderEmail();
   const mailOptions = {
-  from: `EventSphere <${getSenderEmail()}>`,
+  from: `EventSphere <${senderEmail}>`,
   to: [userEmail],
   subject: `Confirmed: Your Ticket for ${eventTitle} (Ref: ${bookingRef || 'CONFIRMED'})`,
   html: `         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">              <div style="background-color: #0f172a; padding: 28px 24px; text-align: center;">                  <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: -0.5px; font-weight: 800;">
@@ -45,8 +55,16 @@ return email;
   const { data, error } = await resend.emails.send(mailOptions);
 
   if (error) {
-  console.error('Booking email delivery failed:', error.message);
-  throw new Error('Booking confirmation email could not be sent.');
+    console.error('Booking email delivery failed:', error.message);
+    const err = new Error(error.message || 'Booking confirmation email could not be sent.');
+    err.isDomainRestricted = Boolean(
+      error.message && (
+        error.message.includes('testing emails') ||
+        error.message.includes('verify a domain') ||
+        error.message.includes('only send testing emails')
+      )
+    );
+    throw err;
   }
 
   return data;
@@ -66,8 +84,15 @@ return email;
   ? 'Please use the 6-digit one-time password below to verify your new EventSphere account and activate full access.'
   : 'Please enter the 6-digit verification code below to authorize your event booking action.';
 
+  if (!resend) {
+    const err = new Error('Email delivery service is unconfigured. RESEND_API_KEY is not set.');
+    err.isConfigurationError = true;
+    throw err;
+  }
+
+  const senderEmail = getSenderEmail();
   const mailOptions = {
-  from: `EventSphere Security <${getSenderEmail()}>`,
+  from: `EventSphere Security <${senderEmail}>`,
   to: [userEmail],
   subject: `${isRegister ? 'Account Verification' : 'Booking Verification'}: Your EventSphere code`,
   html: `          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">              <div style="background-color: #0f172a; padding: 26px 20px; text-align: center;">                  <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800;">
@@ -83,11 +108,117 @@ return email;
   const { data, error } = await resend.emails.send(mailOptions);
 
   if (error) {
-  console.error('OTP email delivery failed:', error.message);
-  throw new Error('Verification email could not be sent.');
+    console.error('OTP email delivery failed:', error.message);
+    const err = new Error(error.message || 'Verification email could not be sent.');
+    err.isDomainRestricted = Boolean(
+      error.message && (
+        error.message.includes('testing emails') ||
+        error.message.includes('verify a domain') ||
+        error.message.includes('only send testing emails')
+      )
+    );
+    throw err;
   }
 
   return data;
-  };
+};
 
-module.exports = { sendBookingEmail, sendOTPEmail };
+const getSanitizedDiagnostic = (err) => {
+  const rawMsg = err?.message || '';
+  const text = rawMsg.toLowerCase();
+  const status = err?.status || err?.statusCode || (typeof err?.code === 'number' ? err.code : null);
+  const code = typeof err?.code === 'string' ? err.code : null;
+
+  let category = 'PROVIDER_ERROR';
+  let sanitizedMessage = 'An unexpected email provider error occurred.';
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    text.includes('unauthorized') ||
+    text.includes('forbidden') ||
+    text.includes('api key') ||
+    text.includes('invalid key') ||
+    text.includes('restricted_api_key')
+  ) {
+    category = 'AUTHENTICATION_ERROR';
+    sanitizedMessage = 'Authentication or API authorization failed with the email provider.';
+  } else if (
+    status === 429 ||
+    text.includes('rate limit') ||
+    text.includes('too many requests') ||
+    text.includes('quota')
+  ) {
+    category = 'RATE_LIMIT_ERROR';
+    sanitizedMessage = 'Email provider rate limit or sending quota exceeded.';
+  } else if (
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENOTFOUND' ||
+    text.includes('timeout') ||
+    text.includes('econnrefused') ||
+    text.includes('econnreset') ||
+    text.includes('enotfound') ||
+    text.includes('network') ||
+    text.includes('fetch failed')
+  ) {
+    category = 'NETWORK_ERROR';
+    sanitizedMessage = 'Network communication with the email provider failed or timed out.';
+  } else if (status >= 500 && status < 600) {
+    category = 'UPSTREAM_SERVICE_ERROR';
+    sanitizedMessage = 'Email provider experienced an upstream service failure (5xx).';
+  } else if (
+    (status >= 400 && status < 500) ||
+    text.includes('bad request') ||
+    text.includes('validation') ||
+    text.includes('invalid')
+  ) {
+    category = 'VALIDATION_ERROR';
+    sanitizedMessage = 'Email provider rejected request payload as invalid.';
+  }
+
+  const details = [];
+  if (status) details.push(`status: ${status}`);
+  if (code && !code.includes('/') && !code.includes('\\')) details.push(`code: ${code}`);
+
+  if (details.length > 0) {
+    sanitizedMessage += ` (${details.join(', ')})`;
+  }
+
+  return { category, sanitizedMessage };
+};
+
+const formatEmailErrorMessage = (err) => {
+  const rawMsg = err?.message || '';
+  if (
+    err?.isDomainRestricted ||
+    rawMsg.includes('testing emails') ||
+    rawMsg.includes('verify a domain') ||
+    rawMsg.includes('only send testing emails')
+  ) {
+    return "Email delivery restricted: In test mode without a custom domain, emails can only be sent to the administrator's registered email address. Please retry with the admin email or verify a custom domain in Resend.";
+  }
+  if (
+    err?.isConfigurationError ||
+    rawMsg.includes('RESEND_API_KEY') ||
+    rawMsg.includes('RESEND_FROM_EMAIL') ||
+    rawMsg.includes('unconfigured') ||
+    rawMsg.includes('configuration is missing')
+  ) {
+    return 'Email delivery service is currently not configured. Please contact the administrator.';
+  }
+
+  // Diagnostic log on server: safe error category and sanitized message (no arbitrary raw error messages)
+  const { category, sanitizedMessage } = getSanitizedDiagnostic(err);
+  console.error(`Diagnostic - Email provider error [Category: ${category}]: ${sanitizedMessage}`);
+
+  return 'Email delivery failed. Please try again later or contact support.';
+};
+
+module.exports = {
+  sendBookingEmail,
+  sendOTPEmail,
+  formatEmailErrorMessage,
+  getSenderEmail,
+  getSanitizedDiagnostic
+};

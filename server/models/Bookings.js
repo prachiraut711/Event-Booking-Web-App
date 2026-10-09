@@ -36,7 +36,7 @@ const bookingSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['test_checkout', 'free_rsvp', 'manual_approval', 'none'],
+        enum: ['test_checkout', 'free_rsvp', 'manual_approval', 'booking_request', 'none'],
         default: 'manual_approval'
     },
     amount: {

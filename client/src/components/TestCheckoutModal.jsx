@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FaTimes, FaShieldAlt, FaCreditCard, FaLock, FaCheck } from 'react-icons/fa';
 
-const TestCheckoutModal = ({ isOpen, event, quantity, user, onConfirm, onClose, loading }) => {
+const TestCheckoutModal = ({ isOpen, event, quantity, user, onConfirm, onRequestPending, onClose, loading }) => {
     const [selectedMethod, setSelectedMethod] = useState('card');
 
     if (!isOpen || !event) return null;
@@ -118,30 +118,42 @@ const TestCheckoutModal = ({ isOpen, event, quantity, user, onConfirm, onClose, 
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center gap-3">
+                <div className="p-6 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-white transition"
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-white transition disabled:opacity-50"
                     >
                         Cancel
                     </button>
-                    <button
-                        type="button"
-                        onClick={onConfirm}
-                        disabled={loading}
-                        className="flex-grow flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-orange-500/20 transition disabled:opacity-50"
-                    >
-                        {loading ? (
-                            <span>Confirming Reservation...</span>
-                        ) : (
-                            <>
-                                <FaLock className="text-xs" />
-                                <span>Confirm Test Payment • ₹{totalAmount}</span>
-                            </>
+                    <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2">
+                        {onRequestPending && (
+                            <button
+                                type="button"
+                                onClick={onRequestPending}
+                                disabled={loading}
+                                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 hover:border-slate-800 text-slate-700 hover:text-slate-900 font-bold text-xs transition disabled:opacity-50"
+                            >
+                                Request Booking (Pending)
+                            </button>
                         )}
-                    </button>
+                        <button
+                            type="button"
+                            onClick={onConfirm}
+                            disabled={loading}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-orange-500/20 transition disabled:opacity-50 text-sm"
+                        >
+                            {loading ? (
+                                <span>Confirming Reservation...</span>
+                            ) : (
+                                <>
+                                    <FaLock className="text-xs" />
+                                    <span>Confirm Test Payment • ₹{totalAmount}</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

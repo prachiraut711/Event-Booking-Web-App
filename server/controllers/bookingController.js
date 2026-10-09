@@ -108,17 +108,29 @@ exports.bookEvent = async (req, res) => {
         const bookingStatus = isInstantConfirmed ? 'confirmed' : 'pending';
         const paymentStatus = isInstantConfirmed ? 'paid' : 'not_paid';
 
-        const booking = await Booking.create({
-            userId: req.user.id,
-            eventId,
-            bookingReference,
-            quantity: requestedQuantity,
-            status: bookingStatus,
-            paymentStatus,
-            paymentMethod: isFree ? 'free_rsvp' : paymentMethod,
-            amount: totalAmount,
-            bookedAt: new Date()
-        });
+        let booking;
+        try {
+            booking = await Booking.create({
+                userId: req.user.id,
+                eventId,
+                bookingReference,
+                quantity: requestedQuantity,
+                status: bookingStatus,
+                paymentStatus,
+                paymentMethod: isFree ? 'free_rsvp' : paymentMethod,
+                amount: totalAmount,
+                bookedAt: new Date()
+            });
+        } catch (createErr) {
+            // Safe targeted rollback: restore reserved seats if booking record creation failed
+            await Event.findByIdAndUpdate(
+                eventId,
+                { $inc: { availableSeats: requestedQuantity } }
+            ).catch(rollbackErr => {
+                console.error('Failed to rollback seats after booking creation failure:', rollbackErr.message);
+            });
+            throw createErr;
+        }
 
         // Populate details for response
         const populatedBooking = await Booking.findById(booking._id)
@@ -153,7 +165,7 @@ exports.bookEvent = async (req, res) => {
 // PUT /api/bookings/:id/confirm (Admin only)
 exports.confirmBooking = async (req, res) => {
     try {
-        const { paymentStatus = 'paid' } = req.body;
+        const { paymentStatus } = req.body;
         const booking = await Booking.findById(req.params.id)
             .populate('userId', 'name email')
             .populate('eventId');
@@ -166,22 +178,23 @@ exports.confirmBooking = async (req, res) => {
             return res.status(400).json({ message: 'Booking is already confirmed' });
         }
 
-        // Atomically deduct seats upon confirmation if seats were not deducted yet
-        if (booking.status !== 'confirmed') {
-            const eventId = booking.eventId?._id || booking.eventId;
-            const requestedSeats = booking.quantity || 1;
-            const updatedEvent = await Event.findOneAndUpdate(
-                { _id: eventId, availableSeats: { $gte: requestedSeats } },
-                { $inc: { availableSeats: -requestedSeats } },
-                { new: true }
-            );
-            if (!updatedEvent) {
-                return res.status(400).json({ message: 'No seats available to confirm this booking' });
-            }
+        if (booking.status === 'cancelled') {
+            return res.status(400).json({ message: 'Cannot confirm a cancelled booking' });
         }
 
+        // Seats were already atomically reserved when the booking was created in bookEvent.
+        // Confirming transitions the pending status to confirmed without deducting seats again.
         booking.status = 'confirmed';
-        booking.paymentStatus = paymentStatus;
+
+        if (booking.paymentMethod === 'booking_request') {
+            // Admin approval alone does not claim money was received without a real payment integration
+            booking.paymentStatus = 'not_paid';
+        } else if (paymentStatus) {
+            booking.paymentStatus = paymentStatus;
+        } else if (!booking.paymentStatus) {
+            booking.paymentStatus = 'not_paid';
+        }
+
         if (!booking.bookingReference) {
             booking.bookingReference = generateBookingReference();
         }
@@ -258,18 +271,52 @@ exports.cancelBooking = async (req, res) => {
             return res.status(400).json({ message: 'This booking is already cancelled' });
         }
 
-        const wasConfirmed = booking.status === 'confirmed';
         const qtyToRestore = booking.quantity || 1;
+        const eventId = booking.eventId?._id || booking.eventId;
 
-        booking.status = 'cancelled';
-        await booking.save();
+        // Atomically transition status away from active status ('confirmed' or 'pending') to prevent race conditions
+        const updatedBooking = await Booking.findOneAndUpdate(
+            { _id: booking._id, status: { $in: ['confirmed', 'pending'] } },
+            { $set: { status: 'cancelled' } },
+            { new: true }
+        );
 
-        // Atomically restore available seats back to event if it was confirmed
-        if (wasConfirmed && booking.eventId) {
-            await Event.findByIdAndUpdate(
-                booking.eventId,
-                { $inc: { availableSeats: qtyToRestore } }
+        if (!updatedBooking) {
+            return res.status(400).json({ message: 'This booking is already cancelled or cannot be cancelled' });
+        }
+
+        if (!eventId) {
+            console.error(`Associated event reference missing for booking ${booking._id}. Seats could not be restored.`);
+            return res.status(404).json({ message: 'Associated event not found. Seats could not be released.' });
+        }
+
+        // Restore reserved seats back to the event for both confirmed and pending bookings.
+        // NOTE: Without a multi-document transaction, this provides at-most-once seat restoration.
+        // We do not roll back the booking status on network/database error because an ambiguous write
+        // (succeeded in MongoDB but timed out on the wire) followed by rollback would risk double-releasing seats on retry.
+        let updatedEvent;
+        try {
+            updatedEvent = await Event.findByIdAndUpdate(
+                eventId,
+                { $inc: { availableSeats: qtyToRestore } },
+                { new: true }
             );
+        } catch (seatErr) {
+            console.error('Failed to restore event seats during booking cancellation:', {
+                bookingId: booking._id,
+                eventId,
+                qtyToRestore,
+                error: seatErr.message
+            });
+            return res.status(500).json({
+                message: 'Booking cancellation was recorded, but seat restoration could not be confirmed and may require reconciliation.',
+                error: seatErr.message
+            });
+        }
+
+        if (!updatedEvent) {
+            console.error(`Event ${eventId} not found when cancelling booking ${booking._id}. No seats restored.`);
+            return res.status(404).json({ message: 'Associated event not found. Seats could not be released.' });
         }
 
         res.json({ message: 'Booking cancelled successfully. Seats have been released.' });

@@ -27,6 +27,7 @@ const EventDetail = () => {
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [bookingLoading, setBookingLoading] = useState(false);
+    const [selectedAction, setSelectedAction] = useState(null);
     const [quantity, setQuantity] = useState(1);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [error, setError] = useState('');
@@ -66,14 +67,17 @@ const EventDetail = () => {
 
         if (isFree) {
             // Instant free booking
+            setSelectedAction('free_rsvp');
             executeBooking('free_rsvp');
         } else {
             // Open simulated test checkout modal
+            setSelectedAction('test_checkout');
             setShowCheckoutModal(true);
         }
     };
 
     const executeBooking = async (paymentMethod = 'test_checkout') => {
+        setSelectedAction(paymentMethod);
         setBookingLoading(true);
         setError('');
 
@@ -89,19 +93,24 @@ const EventDetail = () => {
                 setEvent((prev) => ({ ...prev, availableSeats: data.availableSeats }));
             }
 
-            toast.success(data.message || 'Booking confirmed!');
             setShowCheckoutModal(false);
 
-            // Navigate to payment-success with complete booking context
-            navigate('/payment-success', {
-                state: {
-                    booking: data.booking,
-                    eventTitle: event.title,
-                    bookingReference: data.booking?.bookingReference,
-                    quantity,
-                    amount: event.ticketPrice * quantity
-                }
-            });
+            if (data.booking?.status === 'pending') {
+                toast.success(data.message || 'Booking request submitted! Awaiting administrator confirmation.');
+                navigate('/dashboard');
+            } else {
+                toast.success(data.message || 'Booking confirmed!');
+                // Navigate to payment-success with complete booking context
+                navigate('/payment-success', {
+                    state: {
+                        booking: data.booking,
+                        eventTitle: event.title,
+                        bookingReference: data.booking?.bookingReference,
+                        quantity,
+                        amount: event.ticketPrice * quantity
+                    }
+                });
+            }
         } catch (err) {
             const errMsg = err.response?.data?.message || 'Failed to complete booking. Please try again.';
             setError(errMsg);
@@ -365,9 +374,37 @@ const EventDetail = () => {
                                     )}
                                 </button>
 
+                                {/* Optional Pending Booking Request for Paid Events */}
+                                {!isSoldOut && !isFree && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!user) {
+                                                navigate('/login', { state: { from: `/events/${id}` } });
+                                                return;
+                                            }
+                                            setSelectedAction('booking_request');
+                                            executeBooking('booking_request');
+                                        }}
+                                        disabled={bookingLoading}
+                                        className="w-full py-2.5 px-4 rounded-xl border border-slate-300 hover:border-slate-800 text-slate-700 hover:text-slate-900 font-semibold text-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                    >
+                                        <span>Request Booking (Pending)</span>
+                                    </button>
+                                )}
+
                                 <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 font-medium">
-                                    <FaShieldAlt className="text-emerald-500" />
-                                    <span>Instant digital QR E-Ticket pass generated</span>
+                                    {selectedAction === 'booking_request' ? (
+                                        <>
+                                            <FaClock className="text-amber-500" />
+                                            <span>Digital QR E-Ticket pass generated upon admin confirmation</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FaShieldAlt className="text-emerald-500" />
+                                            <span>Instant digital QR E-Ticket pass generated</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -383,6 +420,7 @@ const EventDetail = () => {
                 user={user}
                 loading={bookingLoading}
                 onConfirm={() => executeBooking('test_checkout')}
+                onRequestPending={() => executeBooking('booking_request')}
                 onClose={() => setShowCheckoutModal(false)}
             />
         </div>

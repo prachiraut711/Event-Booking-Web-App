@@ -68,9 +68,6 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('token', data.token);
             return data;
         } catch (error) {
-            if (error.response?.data?.needsVerification) {
-                throw error.response.data;
-            }
             throw new Error(error.response?.data?.message || 'Login failed. Please check your credentials.');
         }
     };
@@ -78,11 +75,11 @@ export const AuthProvider = ({ children }) => {
     const register = async (name, email, password) => {
         try {
             const { data } = await api.post('/auth/register', { name, email, password });
-            return data; // Returns { message, email, needsVerification, emailDeliveryFailed? }
+            setUser(data);
+            localStorage.setItem('userInfo', JSON.stringify(data));
+            localStorage.setItem('token', data.token);
+            return data;
         } catch (error) {
-            if (error.response?.data?.needsVerification) {
-                throw error.response.data;
-            }
             const serverMsg = error.response?.data?.message;
             throw new Error(serverMsg || 'Registration failed. Please try again.');
         }

@@ -19,56 +19,45 @@ exports.register = async (req, res) => {
             return res.status(400).json({ message: 'Name, email, and password are required' });
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
-        let user = await User.findOne({ email: normalizedEmail });
+        if (typeof password !== 'string' || password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+        }
 
-        if (user && user.isVerified) {
+        const normalizedEmail = email.toLowerCase().trim();
+
+        // Extra protection: prevent public registration on admin email
+        if (normalizedEmail === 'prachiraut711@gmail.com') {
+            return res.status(400).json({ message: 'User already exists with this email' });
+        }
+
+        // Reject registration for any already-registered email
+        const existingUser = await User.findOne({ email: normalizedEmail });
+        if (existingUser) {
             return res.status(400).json({ message: 'User already exists with this email' });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        if (user && !user.isVerified) {
-            user.name = name.trim();
-            user.password = hashedPassword;
-            await user.save();
-        } else {
-            user = await User.create({
-                name: name.trim(),
-                email: normalizedEmail,
-                password: hashedPassword,
-                role: 'user', // Enforce user role
-                isVerified: false
-            });
-        }
+        // Always enforce role 'user'; never accept role from client input
+        const user = await User.create({
+            name: name.trim(),
+            email: normalizedEmail,
+            password: hashedPassword,
+            role: 'user',
+            isVerified: true
+        });
 
-        const otp = generateOTP();
-        await OTP.findOneAndDelete({ email: normalizedEmail, action: 'account_verification' });
-        await OTP.create({ email: normalizedEmail, otp, action: 'account_verification' });
+        const token = generateToken(user.id, user.role);
 
-        if (process.env.NODE_ENV === 'development') {
-            console.log(`🔑 [DEV ONLY] Verification OTP for ${normalizedEmail}: ${otp}`);
-        }
-
-        // Attempt sending email
-        try {
-            await sendOTPEmail(normalizedEmail, otp, 'account_verification');
-            return res.status(201).json({
-                message: 'OTP sent to email. Please verify to activate your account.',
-                email: user.email,
-                needsVerification: true
-            });
-        } catch (emailErr) {
-            console.error('Email delivery error on register:', emailErr.message);
-            const userFriendlyMessage = formatEmailErrorMessage(emailErr);
-            return res.status(502).json({
-                message: userFriendlyMessage,
-                emailDeliveryFailed: true,
-                email: user.email,
-                needsVerification: true
-            });
-        }
+        res.status(201).json({
+            _id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            token,
+            message: 'Account created successfully!'
+        });
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Server error during registration', error: error.message });
@@ -93,34 +82,6 @@ exports.login = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid email or password' });
-        }
-
-        if (!user.isVerified && user.role !== 'admin') {
-            const otp = generateOTP();
-            await OTP.findOneAndDelete({ email: user.email, action: 'account_verification' });
-            await OTP.create({ email: user.email, otp, action: 'account_verification' });
-
-            if (process.env.NODE_ENV === 'development') {
-                console.log(`🔑 [DEV ONLY] Verification OTP for ${user.email}: ${otp}`);
-            }
-
-            try {
-                await sendOTPEmail(user.email, otp, 'account_verification');
-                return res.status(403).json({
-                    message: 'Account not verified. A new OTP has been sent to your email.',
-                    needsVerification: true,
-                    email: user.email
-                });
-            } catch (emailErr) {
-                console.error('Email delivery error on login:', emailErr.message);
-                const userFriendlyMessage = formatEmailErrorMessage(emailErr);
-                return res.status(403).json({
-                    message: `Account not verified. ${userFriendlyMessage}`,
-                    needsVerification: true,
-                    emailDeliveryFailed: true,
-                    email: user.email
-                });
-            }
         }
 
         res.json({

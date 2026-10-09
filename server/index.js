@@ -67,9 +67,9 @@ app.use((err, req, res, next) => {
 const MONGODB_URL = process.env.MONGODB_URL || 'mongodb://localhost:27017/eventsphere';
 
 mongoose.connect(MONGODB_URL)
-
     .then(() => {
         console.log('✅ Connected to MongoDB successfully');
+        console.log('📦 Connected database name:', mongoose.connection.name);
     })
 
     .catch((error) => {
